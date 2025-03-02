@@ -7,8 +7,6 @@ import (
 )
 
 
-
- 
 func redirectUrlHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodGet{
@@ -16,14 +14,13 @@ func redirectUrlHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortUrl := strings.TrimPrefix(r.URL.Path, "/")
-	if shortCode == ""{
-		http.Error(w, "Short code required", http.StatusBadRequest)
+	shortUrl := r.URL.Path
+	if shortUrl == ""{
+		http.NotFound(w,r)
 		return
 	}
 
-
-	longUrl, exists := getItemsFromDB() //fetch data
+	longUrl, exists := getItemsFromDB(shortUrl) //fetch data
 	if !exists{
 		http.NotFound(w, r)
 		return
