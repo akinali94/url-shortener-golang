@@ -1,40 +1,59 @@
-package main
+package idgenerator
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-
+	"time"
 )
 
-func main(){
+var server *http.Server
+
+func Start() error {
 
 	datacenterID, err := GetDatacenterID()
-	if err != nil{
-		return  
-	}
-	machineID, err := GetMachineID()
-	if err != nil{
-		return  
+	if err != nil {
+		fmt.Println("Error:", err)
+		return err
 	}
 
+	machineID, err := GetMachineID()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return err
+	}
 
 	snowflake, err := NewSnowflake(datacenterID, machineID)
 	if err != nil {
 		fmt.Println("Error:", err)
-		return
+		return err
 	}
 
-	
 	l := log.New(os.Stdout, "id-generator-api", log.LstdFlags)
 
-	gh := NewGeneratorHandler(l, snowflake)
+	gh := NewHandler(l, snowflake)
 
-	http.HandleFunc("/getID", gh.GenerateId)
+	mux := http.NewServeMux()
 
+	mux.HandleFunc("/getid", gh.GenerateId)
 
-	log.Printf("starting server at :8081")
-	log.Fatal(http.ListenAndServe(":8081", nil))
+	server = &http.Server{
+		Addr:         ":8081",
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
 
+	log.Println("ID Generator listening on :8081")
+	return server.ListenAndServe()
+}
+
+// Shutdown gracefully stops the URL Shortener service
+func Shutdown(ctx context.Context) error {
+	if server == nil {
+		return nil
+	}
+	return server.Shutdown(ctx)
 }

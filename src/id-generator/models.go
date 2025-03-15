@@ -1,6 +1,5 @@
-package main
+package idgenerator
 
-
-type Response struct{
-	ID int64
+type Response struct {
+	ID uint64 `json:"ID"`
 }

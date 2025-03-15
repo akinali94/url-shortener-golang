@@ -1,13 +1,12 @@
-package main
+package urlshortener
 
-
-//Excluded 0 (zero), I, O (ou), l
-const Base58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz" 
+// Excluded 0 (zero), I, O (ou), l
+const Base58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
 func Base10toBase58(num uint64) string {
 
 	var Base58Alphabet string
-	
+
 	if num == 0 {
 		return "1" // Base-58 equivalent of zero
 	}

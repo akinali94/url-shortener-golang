@@ -1,4 +1,4 @@
-package main
+package idgenerator
 
 import (
 	"encoding/json"
@@ -6,29 +6,27 @@ import (
 	"net/http"
 )
 
-
-type GeneratorHandler struct{
-	l *log.Logger
+type Handler struct {
+	l  *log.Logger
 	sf *Snowflake
 }
 
-func NewGeneratorHandler(logging *log.Logger, snowflake *Snowflake) *GeneratorHandler{
-	return &GeneratorHandler{
-		l: logging,
+func NewHandler(logging *log.Logger, snowflake *Snowflake) *Handler {
+	return &Handler{
+		l:  logging,
 		sf: snowflake,
 	}
 }
 
-func (gh *GeneratorHandler) GenerateId(w http.ResponseWriter, r *http.Request){
+func (gh *Handler) GenerateId(w http.ResponseWriter, r *http.Request) {
 
-	if r.Method != http.MethodGet{
+	if r.Method != http.MethodGet {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	
 
 	id, err := gh.sf.NextID()
-	if err != nil{
+	if err != nil {
 		gh.l.Println(err)
 	}
 
