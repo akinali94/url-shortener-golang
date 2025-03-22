@@ -1,11 +1,9 @@
 package urlshortener
 
-// Excluded 0 (zero), I, O (ou), l
+// Excluded 0 (zero),I,O(ou) and l
 const Base58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
 func Base10toBase58(num uint64) string {
-
-	var Base58Alphabet string
 
 	if num == 0 {
 		return "1" // Base-58 equivalent of zero

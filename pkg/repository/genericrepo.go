@@ -14,6 +14,7 @@ type GenericMongoRepo[T any] struct {
 }
 
 func NewRepository[T any](mongoColl *mongo.Collection) *GenericMongoRepo[T] {
+	fmt.Println("NEW REPO CALISTI")
 	return &GenericMongoRepo[T]{
 		coll: mongoColl,
 	}
@@ -55,11 +56,10 @@ func (c *GenericMongoRepo[T]) GetByField(val string, field string) (*T, error) {
 	defer cancel()
 
 	var item T
-	filter := bson.M{field: val}
+	filter := bson.D{{"shortUrl", val}}
 	err := c.coll.FindOne(ctx, filter).Decode(&item)
-
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println("GetByField'da hata, err: " + err.Error())
 	}
 
 	return &item, err

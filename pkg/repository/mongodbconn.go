@@ -7,20 +7,29 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-func DbConnection(connStr string, dbName string, dbColl string) *mongo.Collection {
-	client, err := mongo.Connect(options.Client().ApplyURI(connStr))
+type MongoDB struct {
+	Client     *mongo.Client
+	Database   *mongo.Database
+	Collection *mongo.Collection
+}
 
+func NewMongoDB(connString, dbName, collectionName string) (*MongoDB, error) {
+
+	client, err := mongo.Connect(options.Client().ApplyURI(connString))
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	defer func() {
-		if err := client.Disconnect(context.TODO()); err != nil {
-			panic(err)
-		}
-	}()
+	database := client.Database(dbName)
+	collection := database.Collection(collectionName)
 
-	coll := client.Database(dbName).Collection(dbColl)
+	return &MongoDB{
+		Client:     client,
+		Database:   database,
+		Collection: collection,
+	}, nil
+}
 
-	return coll
+func (m *MongoDB) Close(ctx context.Context) error {
+	return m.Client.Disconnect(ctx)
 }

@@ -2,6 +2,7 @@ package urlshortener
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -13,9 +14,17 @@ var server *http.Server
 
 func Start() error {
 
-	//
-	mc := repository.DbConnection("mongodb://localhost:27017", "denemedb", "urlshort")
-	repo := repository.NewRepository[URLMapping](mc)
+	mdb, err := repository.NewMongoDB("mongodb://localhost:27017", "denemedb", "urlshort")
+	if err != nil {
+		fmt.Println("Cannot Connect to Database, err:" + err.Error())
+		return err
+	}
+	defer func() {
+		fmt.Println("DEFER CALISTI")
+		mdb.Close(context.TODO())
+	}()
+
+	repo := repository.NewRepository[URLMapping](mdb.Collection)
 
 	service := NewService(repo)
 
@@ -24,7 +33,7 @@ func Start() error {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/shorten", handler.shortenUrlHandler)
-	mux.HandleFunc("/", handler.mainPageHandler)
+	mux.HandleFunc("/", handler.redirectUrlHandler)
 
 	server = &http.Server{
 		Addr:         ":8080",

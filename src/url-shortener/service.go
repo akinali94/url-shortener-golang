@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/akinali94/url-shortener-golang/pkg/repository"
@@ -46,18 +47,10 @@ func (s *Service) generateShortUrl(longUrl string) (string, error) {
 	}
 	fmt.Println(idModel)
 
-	/*
-		id, err := strconv.ParseUint(idModel.ID, 10, 64)
-		if err != nil {
-			fmt.Printf("error on 52. err: %s", err)
-			return "", err
-		}
-		fmt.Println(id)
-	*/
-
 	shortUrl := Base10toBase58(idModel.ID)
 
 	urlMapping := URLMapping{
+		ID:        strconv.FormatUint(uint64(idModel.ID), 10),
 		ShortUrl:  shortUrl,
 		LongUrl:   longUrl,
 		CreatedAt: time.Now(),
