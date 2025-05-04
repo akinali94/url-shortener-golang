@@ -2,6 +2,7 @@ package idgenerator
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 )
@@ -33,6 +34,7 @@ func (gh *Handler) GenerateId(w http.ResponseWriter, r *http.Request) {
 	resp := Response{
 		ID: id,
 	}
+	fmt.Println("Id created on Generator: ", resp)
 
 	w.Header().Add("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)

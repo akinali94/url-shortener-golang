@@ -3,7 +3,6 @@ package urlshortener
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 )
@@ -50,6 +49,7 @@ func (h *Handler) redirectUrlHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "URL not found", http.StatusNotFound)
 		return
 	}
+	fmt.Print("LongUrl is: ", longUrl)
 	redir := "https://" + longUrl
 
 	http.Redirect(w, r, redir, http.StatusFound)
@@ -61,23 +61,35 @@ func (h *Handler) shortenUrlHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req string
-	body, err := io.ReadAll(r.Body)
+	var requestBody struct {
+		URL string `json:"url"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&requestBody)
 	if err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		http.Error(w, "Invalid JSON request body", http.StatusBadRequest)
 		return
 	}
-	req = string(body)
 
-	shortUrl, err := h.service.generateShortUrl(req)
+	longUrl := strings.TrimSpace(requestBody.URL)
+	longUrl = strings.Trim(longUrl, "\"'")
+
+	if longUrl == "" {
+		http.Error(w, "URL cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	shortUrl, err := h.service.generateShortUrl(longUrl)
 	if err != nil {
 		http.Error(w, "error on generate Short Url", http.StatusBadRequest)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated) // Set header before writing response
+
 	response := map[string]string{"shortUrl": "http://localhost:8080/" + shortUrl}
-
 	json.NewEncoder(w).Encode(response)
-	w.WriteHeader(http.StatusCreated)
 
+	//w.WriteHeader(http.StatusCreated) --> This causing an error: "http: superfluous response.WriteHeader". json.NewEncoder... line is already return with 200 code.
 }

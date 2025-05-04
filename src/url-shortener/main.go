@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/akinali94/url-shortener-golang/pkg/ratelimiter"
 	"github.com/akinali94/url-shortener-golang/pkg/repository"
+	"github.com/redis/go-redis/v9"
 )
 
 var server *http.Server
@@ -30,10 +32,38 @@ func Start() error {
 
 	handler := NewHandler(service)
 
+	// Initialize the rate limiter
+	limiter, err := ratelimiter.NewRateLimiter(ratelimiter.Options{
+		Redis: &redis.Options{
+			Addr: "localhost:6379", // Change to your Redis address
+		},
+		KeyPrefix: "urlshortener:",
+		DefaultRate: ratelimiter.Rate{
+			Limit:  100,         // Allow 100 requests
+			Window: time.Minute, // per minute
+		},
+	})
+	if err != nil {
+		fmt.Println("Cannot initialize rate limiter, err:" + err.Error())
+		return err
+	}
+	defer limiter.Close()
+
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/shorten", handler.shortenUrlHandler)
-	mux.HandleFunc("/", handler.redirectUrlHandler)
+	// Create separate handlers with different rate limits
+	shortenHandler := limiter.Middleware(
+		ratelimiter.IPKeyFunc(true),
+		ratelimiter.Rate{Limit: 10, Window: time.Minute}, //Limit is higher for url creation
+	)(http.HandlerFunc(handler.shortenUrlHandler))
+
+	redirectHandler := limiter.Middleware(
+		ratelimiter.IPKeyFunc(true),
+		ratelimiter.Rate{Limit: 200, Window: time.Minute}, //Lower limit for redirect
+	)(http.HandlerFunc(handler.redirectUrlHandler))
+
+	mux.HandleFunc("/shorten", shortenHandler)
+	mux.HandleFunc("/", redirectHandler)
 
 	server = &http.Server{
 		Addr:         ":8080",
