@@ -22,7 +22,6 @@ func Start() error {
 		return err
 	}
 	defer func() {
-		fmt.Println("DEFER CALISTI")
 		mdb.Close(context.TODO())
 	}()
 
@@ -32,38 +31,41 @@ func Start() error {
 
 	handler := NewHandler(service)
 
-	// Initialize the rate limiter
-	limiter, err := ratelimiter.NewRateLimiter(ratelimiter.Options{
-		Redis: &redis.Options{
-			Addr: "localhost:6379", // Change to your Redis address
-		},
-		KeyPrefix: "urlshortener:",
-		DefaultRate: ratelimiter.Rate{
-			Limit:  100,         // Allow 100 requests
-			Window: time.Minute, // per minute
-		},
+	//Rate Limiting Settings
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
 	})
-	if err != nil {
-		fmt.Println("Cannot initialize rate limiter, err:" + err.Error())
-		return err
+
+	defer func() {
+		redisClient.Close()
+	}()
+
+	shortenRateLimiterConfig := &ratelimiter.RateLimiterConfig{
+		Extractor:   ratelimiter.NewHTTPHeadersExtractor(),
+		Strategy:    ratelimiter.NewSortedSetCounterStrategy(redisClient, func() time.Time { return time.Now() }),
+		Expiration:  1 * time.Minute,
+		MaxRequests: 5,
 	}
-	defer limiter.Close()
+
+	redirectRateLimiterConfig := &ratelimiter.RateLimiterConfig{
+		Extractor:   ratelimiter.NewHTTPHeadersExtractor(),
+		Strategy:    ratelimiter.NewSortedSetCounterStrategy(redisClient, func() time.Time { return time.Now() }),
+		Expiration:  1 * time.Minute,
+		MaxRequests: 3,
+	}
 
 	mux := http.NewServeMux()
 
-	// Create separate handlers with different rate limits
-	shortenHandler := limiter.Middleware(
-		ratelimiter.IPKeyFunc(true),
-		ratelimiter.Rate{Limit: 10, Window: time.Minute}, //Limit is higher for url creation
-	)(http.HandlerFunc(handler.shortenUrlHandler))
+	shortenHandler := http.HandlerFunc(handler.shortenUrlHandler)
+	shortenRateLimitedHandler := ratelimiter.NewHTTPRateLimiterHandler(shortenHandler, shortenRateLimiterConfig)
 
-	redirectHandler := limiter.Middleware(
-		ratelimiter.IPKeyFunc(true),
-		ratelimiter.Rate{Limit: 200, Window: time.Minute}, //Lower limit for redirect
-	)(http.HandlerFunc(handler.redirectUrlHandler))
+	redirectHandler := http.HandlerFunc(handler.redirectUrlHandler)
+	redirectRateLimitedHandler := ratelimiter.NewHTTPRateLimiterHandler(redirectHandler, redirectRateLimiterConfig)
 
-	mux.HandleFunc("/shorten", shortenHandler)
-	mux.HandleFunc("/", redirectHandler)
+	mux.Handle("/shorten", shortenRateLimitedHandler)
+	mux.Handle("/", redirectRateLimitedHandler)
 
 	server = &http.Server{
 		Addr:         ":8080",
