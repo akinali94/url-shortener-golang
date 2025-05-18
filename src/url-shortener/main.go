@@ -2,9 +2,11 @@ package urlshortener
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/akinali94/url-shortener-golang/pkg/ratelimiter"
@@ -16,7 +18,18 @@ var server *http.Server
 
 func Start() error {
 
-	mdb, err := repository.NewMongoDB("mongodb://localhost:27017", "denemedb", "urlshort")
+	baseDomain := os.Getenv("BASE_DOMAIN")
+	mongoURI := os.Getenv("MONGO_URI")
+	mongoDB := os.Getenv("MONGO_DB")
+	mongoCollection := os.Getenv("MONGO_COLLECTION")
+	redisAddr := os.Getenv("REDIS_ADDR")
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+
+	if mongoURI == "" || mongoDB == "" || mongoCollection == "" || redisAddr == "" || redisPassword == "" {
+		return errors.New("environment variables are empty")
+	}
+
+	mdb, err := repository.NewMongoDB(mongoURI, mongoDB, mongoCollection)
 	if err != nil {
 		fmt.Println("Cannot Connect to Database, err:" + err.Error())
 		return err
@@ -29,12 +42,12 @@ func Start() error {
 
 	service := NewService(repo)
 
-	handler := NewHandler(service)
+	handler := NewHandler(service, baseDomain)
 
 	//Rate Limiting Settings
 	redisClient := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "",
+		Addr:     redisAddr,
+		Password: redisPassword,
 		DB:       0,
 	})
 
@@ -46,14 +59,14 @@ func Start() error {
 		Extractor:   ratelimiter.NewHTTPHeadersExtractor(),
 		Strategy:    ratelimiter.NewSortedSetCounterStrategy(redisClient, func() time.Time { return time.Now() }),
 		Expiration:  1 * time.Minute,
-		MaxRequests: 5,
+		MaxRequests: 20,
 	}
 
 	redirectRateLimiterConfig := &ratelimiter.RateLimiterConfig{
 		Extractor:   ratelimiter.NewHTTPHeadersExtractor(),
 		Strategy:    ratelimiter.NewSortedSetCounterStrategy(redisClient, func() time.Time { return time.Now() }),
 		Expiration:  1 * time.Minute,
-		MaxRequests: 3,
+		MaxRequests: 75,
 	}
 
 	mux := http.NewServeMux()

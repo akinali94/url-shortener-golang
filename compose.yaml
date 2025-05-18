@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  shortener:
+    build: .
+    command: ["./urlshortener", "--service=shortener"]
+    ports:
+      - "8080:8080"
+    environment:
+      - BASE_DOMAIN=localhost:8080
+      - MONGO_URI=mongodb://mongo:27017
+      - MONGO_DB=urlshortener
+      - MONGO_COLLECTION=shortener
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=abc
+    depends_on:
+      - mongo
+      - redis
+    restart: always
+
+  idgenerator:
+    build: .
+    command: ["./urlshortener", "--service=idgenerator"]
+    ports:
+      - "8081:8081"
+    environment:
+      - DATACENTER_ID=1
+      - MACHINE_ID=1
+    restart: always
+
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: always
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+
+volumes:
+  mongo_data:
+  redis_data:

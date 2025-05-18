@@ -14,7 +14,6 @@ type GenericMongoRepo[T any] struct {
 }
 
 func NewRepository[T any](mongoColl *mongo.Collection) *GenericMongoRepo[T] {
-	fmt.Println("NEW REPO CALISTI")
 	return &GenericMongoRepo[T]{
 		coll: mongoColl,
 	}

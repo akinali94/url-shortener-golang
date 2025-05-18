@@ -8,12 +8,14 @@ import (
 )
 
 type Handler struct {
-	service *Service
+	service    *Service
+	baseDomain string
 }
 
-func NewHandler(s *Service) *Handler {
+func NewHandler(s *Service, d string) *Handler {
 	return &Handler{
-		service: s,
+		service:    s,
+		baseDomain: d,
 	}
 }
 
@@ -88,7 +90,8 @@ func (h *Handler) shortenUrlHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated) // Set header before writing response
 
-	response := map[string]string{"shortUrl": "http://localhost:8080/" + shortUrl}
+	shortUrlFormatted := fmt.Sprintf("https://%s/%s", h.baseDomain, shortUrl)
+	response := map[string]string{"shortUrl": shortUrlFormatted}
 	json.NewEncoder(w).Encode(response)
 
 	//w.WriteHeader(http.StatusCreated) --> This causing an error: "http: superfluous response.WriteHeader". json.NewEncoder... line is already return with 200 code.

@@ -15,12 +15,12 @@ import (
 )
 
 func main() {
-	serviceFlag := flag.String("service", "", "Service to run: 'urlshortener', 'idgenerator', or leave empty to run specified services")
+	serviceFlag := flag.String("service", "", "Service to run: 'shortener', 'idgenerator', or leave empty to run specified services")
 	allFlag := flag.Bool("all", false, "Run all services")
 	flag.Parse()
 
 	if *serviceFlag == "" && !*allFlag {
-		fmt.Println("Please specify a service (--service=urlshortener or --service=idgenerator) or use --all to run all services")
+		fmt.Println("Please specify a service (--service=shortener or --service=idgenerator) or use --all to run all services")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
@@ -30,7 +30,7 @@ func main() {
 
 	var wg sync.WaitGroup
 
-	if *serviceFlag == "urlshortener" || *allFlag {
+	if *serviceFlag == "shortener" || *allFlag {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
