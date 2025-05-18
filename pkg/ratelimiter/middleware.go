@@ -10,7 +10,7 @@ import (
 
 var (
 	_            http.Handler = &httpRateLimiterHandler{}
-	_            Extractor    = &httpHeaderExtractor{}
+	_            Extractor    = &ipAddressExtractor{}
 	stateStrings              = map[State]string{
 		Allow: "Allow",
 		Deny:  "Deny",
@@ -31,6 +31,7 @@ type Extractor interface {
 	Extract(r *http.Request) (string, error)
 }
 
+/*
 type httpHeaderExtractor struct {
 	headers []string
 }
@@ -39,8 +40,6 @@ type httpHeaderExtractor struct {
 // rate limiting. You should use headers that are guaranteed to be unique for a client.
 func (h *httpHeaderExtractor) Extract(r *http.Request) (string, error) {
 	values := make([]string, 0, len(h.headers))
-	fmt.Println("Values burada: ")
-	fmt.Println(values)
 
 	for _, key := range h.headers {
 		// if we can't find a value for the headers, give up and return an error.
@@ -53,38 +52,102 @@ func (h *httpHeaderExtractor) Extract(r *http.Request) (string, error) {
 
 	return strings.Join(values, "-"), nil
 }
+*/
 
-/*
 // IP extractor implementation
 type ipAddressExtractor struct{}
 
 func (e *ipAddressExtractor) Extract(r *http.Request) (string, error) {
-	// Try X-Forwarded-For first (if behind proxy)
-	ip := r.Header.Get("X-Forwarded-For")
-	if ip != "" {
-		// X-Forwarded-For can contain multiple IPs, take the first one
-		parts := strings.Split(ip, ",")
-		return strings.TrimSpace(parts[0]), nil
+	// 1. Check common proxy headers in order of reliability
+
+	// X-Forwarded-For (most common)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		ip := strings.TrimSpace(parts[0])
+		if ip != "" {
+			return ip, nil
+		}
 	}
 
-	// Fall back to RemoteAddr
-	ip = r.RemoteAddr
-	// RemoteAddr includes port, so strip that off
-	if colonIndex := strings.LastIndex(ip, ":"); colonIndex != -1 {
-		ip = ip[:colonIndex]
+	// X-Real-IP (used by nginx and others)
+	if xrip := r.Header.Get("X-Real-IP"); xrip != "" {
+		return strings.TrimSpace(xrip), nil
 	}
 
+	// Forwarded header (RFC 7239)
+	if forwarded := r.Header.Get("Forwarded"); forwarded != "" {
+		forParts := strings.Split(forwarded, ";")
+		for _, part := range forParts {
+			part = strings.TrimSpace(part)
+			if strings.HasPrefix(part, "for=") {
+				ip := strings.TrimPrefix(part, "for=")
+				// Remove quotes if present
+				ip = strings.TrimPrefix(ip, "\"")
+				ip = strings.TrimSuffix(ip, "\"")
+				if idx := strings.Index(ip, ","); idx != -1 {
+					ip = ip[:idx]
+				}
+				return strings.TrimSpace(ip), nil
+			}
+		}
+	}
+
+	// CDN-specific headers
+	if cfIP := r.Header.Get("CF-Connecting-IP"); cfIP != "" {
+		return strings.TrimSpace(cfIP), nil
+	}
+
+	if trueClientIP := r.Header.Get("True-Client-IP"); trueClientIP != "" {
+		return strings.TrimSpace(trueClientIP), nil
+	}
+
+	// 2. Fall back to RemoteAddr
+	ip := r.RemoteAddr
+
+	// Handle IPv6 addresses properly
+	// IPv6 addresses in RemoteAddr are enclosed in square brackets: [2001:db8::1]:8080
+	if strings.HasPrefix(ip, "[") {
+		if closeBracket := strings.Index(ip, "]"); closeBracket != -1 {
+			// Extract IP without brackets
+			ip = ip[1:closeBracket]
+		}
+	} else {
+		// IPv4 addresses with port: 192.168.1.1:8080
+		if colonIndex := strings.LastIndex(ip, ":"); colonIndex != -1 {
+			ip = ip[:colonIndex]
+		}
+	}
+
+	// 3. Handle IPv6-mapped IPv4 addresses (::ffff:127.0.0.1)
+	if strings.HasPrefix(ip, "::ffff:") {
+		ip = strings.TrimPrefix(ip, "::ffff:")
+	}
+
+	// 4. Validate that we got something
 	if ip == "" {
+		// Fallback to a unique identifier if available (like User-Agent)
+		userAgent := r.Header.Get("User-Agent")
+		if userAgent != "" {
+			return "unknown-" + userAgent[:min(len(userAgent), 20)], nil
+		}
 		return "", fmt.Errorf("could not extract IP address from request")
 	}
 
 	return ip, nil
 }
-*/
+
+// Helper function for string length limit
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // NewHTTPHeadersExtractor creates a new HTTP header extractor
 func NewHTTPHeadersExtractor(headers ...string) Extractor {
-	return &httpHeaderExtractor{headers: headers}
-	//return &ipAddressExtractor{}
+	//return &httpHeaderExtractor{headers: headers}
+	return &ipAddressExtractor{}
 }
 
 // RateLimiterConfig holds the basic config we need to create a middleware http.Handler object that
@@ -129,7 +192,6 @@ func (h *httpRateLimiterHandler) ServeHTTP(writer http.ResponseWriter, request *
 		h.writeResponse(writer, http.StatusBadRequest, "failed to collect rate limiting key from request: %v", err)
 		return
 	}
-	fmt.Println("KEY BUDUR: ", key)
 
 	result, err := h.config.Strategy.Run(request.Context(), &Request{
 		Key:      key,
@@ -159,73 +221,3 @@ func (h *httpRateLimiterHandler) ServeHTTP(writer http.ResponseWriter, request *
 	// as we have already set the headers, so when the handler flushes the response the headers above will be sent.
 	h.handler.ServeHTTP(writer, request)
 }
-
-/*
-
-package ratelimiter
-
-import (
-	"fmt"
-	"net/http"
-	"time"
-)
-
-// KeyFunc defines a function that extracts a key from an HTTP request
-type KeyFunc func(*http.Request) string
-
-// IPKeyFunc returns a KeyFunc that uses the client's IP address
-func IPKeyFunc(useXForwardedFor bool) KeyFunc {
-	return func(r *http.Request) string {
-		var ip string
-
-		if useXForwardedFor {
-			ip = r.Header.Get("X-Forwarded-For")
-		}
-
-		if ip == "" {
-			ip = r.RemoteAddr
-		}
-
-		return "ip:" + ip
-	}
-}
-
-// Middleware returns an HTTP middleware for rate limiting
-func (rl *RateLimiter) Middleware(keyFn KeyFunc, rate ...Rate) func(http.HandlerFunc) http.HandlerFunc {
-	// Use default rate if none provided
-	r := rl.defaultRate
-	if len(rate) > 0 {
-		r = rate[0]
-	}
-
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, req *http.Request) {
-			// Generate key from request
-			key := keyFn(req)
-
-			// Apply rate limiting
-			allowed, remaining, err := rl.Allow(req.Context(), key, r)
-
-			// Set rate limit headers
-			w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", r.Limit))
-			w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
-			w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", time.Now().Add(r.Window).Unix()))
-
-			if err != nil {
-				// In case of Redis errors, you might want to allow the request
-				// or implement a fallback strategy
-				http.Error(w, "Rate limiting error", http.StatusInternalServerError)
-				return
-			}
-
-			if !allowed {
-				w.Header().Set("Retry-After", fmt.Sprintf("%.0f", r.Window.Seconds()))
-				http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
-				return
-			}
-
-			next.ServeHTTP(w, req)
-		}
-	}
-}
-*/

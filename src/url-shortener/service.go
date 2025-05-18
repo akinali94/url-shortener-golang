@@ -45,7 +45,6 @@ func (s *Service) generateShortUrl(longUrl string) (string, error) {
 		fmt.Printf("error on 45. err: %s", err)
 		return "", err
 	}
-	fmt.Println(idModel)
 
 	shortUrl := Base10toBase58(idModel.ID)
 

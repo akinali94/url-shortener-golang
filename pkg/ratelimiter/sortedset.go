@@ -2,7 +2,6 @@ package ratelimiter
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -42,11 +41,8 @@ type sortedSetCounter struct {
 // bursts of traffic as the counter won't ever expire.
 func (s *sortedSetCounter) Run(ctx context.Context, r *Request) (*Result, error) {
 	now := s.now()
-	fmt.Println(now)
 	expiresAt := now.Add(r.Duration)
-	fmt.Println(expiresAt)
 	minimum := now.Add(-r.Duration)
-	fmt.Println(minimum)
 
 	// first count how many requests over the period we're tracking on this rolling window so check wether
 	// we're already over the limit or not. this prevents new requests from being added if a client is already
@@ -55,8 +51,6 @@ func (s *sortedSetCounter) Run(ctx context.Context, r *Request) (*Result, error)
 	// be reclaimed (as we're not writing data here) so make sure there is an eviction policy that will
 	// clear up the memory if the redis starts to get close to its memory limit.
 	result, err := s.client.ZCount(ctx, r.Key, strconv.FormatInt(minimum.UnixMilli(), 10), sortedSetMax).Uint64()
-	fmt.Println("Result ")
-	fmt.Println(result)
 
 	if err == nil && result >= r.Limit {
 		return &Result{
@@ -105,13 +99,6 @@ func (s *sortedSetCounter) Run(ctx context.Context, r *Request) (*Result, error)
 	}
 
 	requests := uint64(totalRequests)
-	fmt.Println("requests")
-	fmt.Println(requests)
-
-	fmt.Println("--------------")
-	fmt.Println("Request.Limit")
-
-	fmt.Println(r.Limit)
 
 	if requests > r.Limit {
 		return &Result{
