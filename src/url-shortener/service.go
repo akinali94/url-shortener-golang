@@ -11,12 +11,14 @@ import (
 )
 
 type Service struct {
-	repo *repository.GenericMongoRepo[URLMapping]
+	repo              *repository.GenericMongoRepo[URLMapping]
+	idGeneratorDomain string
 }
 
-func NewService(r *repository.GenericMongoRepo[URLMapping]) *Service {
+func NewService(r *repository.GenericMongoRepo[URLMapping], i string) *Service {
 	return &Service{
-		repo: r,
+		repo:              r,
+		idGeneratorDomain: i,
 	}
 }
 
@@ -32,7 +34,9 @@ func (s *Service) getLongUrl(shortUrl string) (string, error) {
 
 func (s *Service) generateShortUrl(longUrl string) (string, error) {
 
-	resp, err := http.Get("http://localhost:8081/getid")
+	getRequest := fmt.Sprintf("http://%s/getid", s.idGeneratorDomain)
+
+	resp, err := http.Get(getRequest)
 	if err != nil {
 		fmt.Printf("Failed to fetch ID from id-generator-service, err: %s", err)
 		return "", err

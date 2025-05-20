@@ -24,6 +24,7 @@ func Start() error {
 	mongoCollection := os.Getenv("MONGO_COLLECTION")
 	redisAddr := os.Getenv("REDIS_ADDR")
 	redisPassword := os.Getenv("REDIS_PASSWORD")
+	idGeneratorDomain := os.Getenv("ID_GENERATOR_DOMAIN")
 
 	if mongoURI == "" || mongoDB == "" || mongoCollection == "" || redisAddr == "" || redisPassword == "" {
 		return errors.New("environment variables are empty")
@@ -40,7 +41,7 @@ func Start() error {
 
 	repo := repository.NewRepository[URLMapping](mdb.Collection)
 
-	service := NewService(repo)
+	service := NewService(repo, idGeneratorDomain)
 
 	handler := NewHandler(service, baseDomain)
 
