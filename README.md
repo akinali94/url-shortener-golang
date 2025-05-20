@@ -2,6 +2,23 @@
 
 A high-performance URL shortening service built with Go, MongoDB, and Redis.
 
+## Table of Contents
+
+- [Features](#features)
+  - [Functional Requirements](#functional-requirements)
+  - [Non-Functional Requirements](#non-functional-requirements)
+- [Technologies Used](#technologies-used)
+- [API Endpoints](#api-endpoints)
+  - [Create Short URL](#create-short-url)
+  - [Redirect to Original URL](#redirect-to-original-url)
+- [System Design Diagram](#system-design-diagram)
+- [Implementation Details](#implementation-details)
+  - [Services](#services)
+  - [Database Choice](#database-choice)
+  - [Security Measures](#security-measures)
+  - [Deployment](#deployment)
+- [References](#references)
+
 ### Functional Requirements
 - **Short URL Generation**: Generate a unique shorter alias for any given URL
 - **Redirection**: Redirect users to the original URL when they access the short link
@@ -52,6 +69,7 @@ GET /:shortUrl
 
 ## Implementation Details
 
+### Services
 The URL shortener consists of two main services:
 
 1. **ID Generator Service**: Generates unique IDs using Snowflake algorithm
@@ -88,4 +106,4 @@ The service is containerized using Docker with a single binary, leveraging Golan
 - [Educative - Grokking the System Design Interview: TinyURL](https://www.educative.io/courses/grokking-the-system-design-interview/requirements-of-tinyurls-design)
 - [Karan Pratap Singh - System Design](https://github.com/karanpratapsingh/system-design?tab=readme-ov-file#url-shortener)
 - Alex Xu - System Design Interview Book
--[Maurício Linhares - Rate Limiting in Go](https://mauricio.github.io/2021/12/30/rate-limiting-in-go.html)
+- [Maurício Linhares - Rate Limiting in Go](https://mauricio.github.io/2021/12/30/rate-limiting-in-go.html)
